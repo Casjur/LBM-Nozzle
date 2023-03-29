@@ -7,6 +7,7 @@ using UnityEngine;
 // 1?. Kleuren zijn verticale strepen, als je in zoomt. Mogelijk gwn bug in Unity
 //      * Groen = verticale strepen
 //      * Blauw = horizontaal
+// 
 
 // Todo:
 // 1. Alles
@@ -16,23 +17,21 @@ public class LBM : MonoBehaviour
 {
     public const int WIDTH = 256;
     public const int HEIGHT = 256;
-    public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
-    public const float RELAXATION_TIME = 1.0f; // 0.1f en waarschijnlijk alles onder 1 breekt de simulatie 
+    //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
+    public const double RELAXATION_TIME = 1.0f; // 0.1f en waarschijnlijk alles onder 1 breekt de simulatie 
 
     public LatticeGrid Grid;
 
-    //public Texture2D outputTexture;
     public Material outputMaterial;
 
     void Start()
     {
-        this.Grid = new LatticeGrid(WIDTH, HEIGHT, VISCOSITY, RELAXATION_TIME);
+        this.Grid = new LatticeGrid(WIDTH, HEIGHT, /* VISCOSITY, */ RELAXATION_TIME);
         //this.Grid.TestInitialize();
     }
 
     void Update()
     {
-        
         this.Grid.CollisionStep();
         this.Grid.StreamingStep();
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
@@ -55,21 +54,25 @@ public class LatticeGridNode
 
     public LatticeGridNode(double density = 0.0f, double velocityX = 0.0f, double velocityY = 0.0f)
     {
-        this.density = density;
-        this.velocityX = velocityX;
-        this.velocityY = velocityY;
-        this.distribution = new double[9];
+        this.density = density; // Only used to display result
+        this.velocityX = velocityX; // Only used to display result
+        this.velocityY = velocityY; // Only used to display result
+        this.distribution = new double[9]; // Only factor with influence in the function
         for(int i = 0; i < 9; i++)
         {
             distribution[i] = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
         }
-
-        //distribution = new double[] { 0, 0, 0.1, 0, 0, 0, 0, 0, 0 }; //new double[9];
     }
 }
 
 public class LatticeGrid
 {
+    // Test variables
+    public double sumDensity = 0.0;
+    public double minDensity = 0.0;
+
+
+    // 
     private int gridWidth;
     private int gridHeight;
     private double relaxationTime;
@@ -80,9 +83,13 @@ public class LatticeGrid
     // Lattice constants
     public static readonly double[] eX = { 0, 1, 0, -1, 0, 1, -1, -1, 1 };
     public static readonly double[] eY = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };
-    public static readonly double[] weights = { 4.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0 };
+    public static readonly double[] weights = { 
+        4.0 / 9.0, 
+        1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 1.0 / 9.0, 
+        1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0 
+    };
 
-    public LatticeGrid(int width, int height, double viscosity, double tau)
+    public LatticeGrid(int width, int height, /* double viscosity, */ double tau)
     {
         gridWidth = width;
         gridHeight = height;
@@ -101,7 +108,7 @@ public class LatticeGrid
         {
             if (i > 2500)
             {
-                latticeGrid[i] = new LatticeGridNode(5.0, 0.0, 0.0);
+                latticeGrid[i] = new LatticeGridNode(1.0, 0.0, 0.0);
             }
             else
             {
@@ -116,7 +123,7 @@ public class LatticeGrid
 
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
-            double r = Random.Range(0.0f, 1.0f);
+            double r = Random.Range(0.1f, 5.0f);
             latticeGrid[i] = new LatticeGridNode(r, 0.0, 0.0);
         }
     }
@@ -173,14 +180,16 @@ public class LatticeGrid
 
     public void CollisionStep()
     {
+        sumDensity = 0.0;
+
         for (int j = 0; j < gridHeight; j++)
         {
             for (int i = 0; i < gridWidth; i++)
             {
                 // Compute rho and velocity
                 double rho = 0.0; // Sum of all distributions in a cell
-                double velocityX = 0.0;
-                double velocityY = 0.0;
+                double velocityX = 0.0; // General velocity of the gas (X)
+                double velocityY = 0.0; // General velocity of the gas (Y)
 
                 LatticeGridNode node = latticeGrid[i + j * gridWidth];
 
@@ -198,36 +207,41 @@ public class LatticeGrid
                 node.velocityX = velocityX;
                 node.velocityY = velocityY;
 
-                // Compute equilibrium distribution
-                //double uSqr = velocityX * velocityX + velocityY * velocityY;
-                //double us = velocityX * eX[0] + velocityY * eY[0]; // NOT USED !?
-                //double[] feq = new double[9];
+                sumDensity += rho;
 
-                //for (int k = 0; k < 9; k++)
-                //{
-                //    double cu = eX[k] * velocityX + eY[k] * velocityY;
-                //    double usq = eX[k] * eX[k] + eY[k] * eY[k];
-
-                //    feq[k] = weights[k] * rho * (1.0 + 3.0 * cu / cSqr + 4.5 * cu * cu / (cSqr * cSqr) - 1.5 * uSqr / cSqr);
-                //}
-
-
+                // Compute equilibrium distribution (aangepast, zonder verandering in resultaat)
                 double[] feq = new double[9];
                 for (int k = 0; k < 9; k++)
                 {
                     feq[k] = EquilibriumFunction(rho, velocityX, velocityY, k);
                 }
 
+                
                 // Collision step
                 for (int k = 0; k < 9; k++)
                 {
-                    // nodeDistr = nodeDistr + (feq - nodeDistr) / tau
-                    // nodeDistr = nodeDistr + (1 / tau) * (feq - nodeDistr)
-                    // nodeDistr += (1 / tau) * (feq - nodeDistr)
-                    node.distribution[k] -= relaxationFactor * (feq[k] - node.distribution[k]);
+                    //node.distribution[k] += relaxationFactor * (feq[k] - node.distribution[k]); // originele
+
+                    node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];
+                }
+
+                // Debug
+                if (i == 40 && j == 40)
+                {
+                    double newRho = 0.0;
+
+                    for (int k = 0; k < 9; k++)
+                    {
+                        newRho += node.distribution[k];
+                    }
+
+                    Debug.Log("Previous Rho: " + rho);
+                    Debug.Log("NewRho: " + newRho);
                 }
             }
         }
+
+        Debug.Log("Collision Density: " + sumDensity);
     }
 
     double EquilibriumFunction(double rho, double ux, double uy, int i)
@@ -241,9 +255,10 @@ public class LatticeGrid
         double udotcx = ux * cx + uy * cy;
 
         // Calculate the equilibrium distribution function for the given velocity component
-        double feq = rho * weight * (1.0 + 3.0 * udotcx + 4.5 * udotcx * udotcx - 1.5 * (ux * ux + uy * uy) * cSqr); // originele
+        //double feq = rho * weight * (1.0 + (3.0 * udotcx) + (4.5 * udotcx * udotcx) - (1.5 * (ux * ux + uy * uy) * cSqr)); // originele
 
-        //double feq = weight * rho * (1.0f + 3.0f * udotcx + 4.5f * udotcx * udotcx - 1.5f * (ux * ux));
+        double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT!
+
         return feq;
     }
 
@@ -304,6 +319,8 @@ public class LatticeGrid
             }
         }
 
+        sumDensity = 0.0;
+
         // Update the lattice grid with the streamed values
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
@@ -311,7 +328,11 @@ public class LatticeGrid
             latticeGrid[i].density = tempGrid[i].density;
             latticeGrid[i].velocityX = tempGrid[i].velocityX;
             latticeGrid[i].velocityY = tempGrid[i].velocityY;
+
+            sumDensity += tempGrid[i].density;
         }
+
+        Debug.Log("Streaming Density: " + sumDensity);
     }
 
     public void UpdateDisplayTexture(int width, int height, ref Material outputMaterial)
@@ -322,14 +343,14 @@ public class LatticeGrid
         {
             for(int y = 0; y < height; y++)
             {
-                //double d = latticeGrid[x + y * gridHeight].distribution[1];
-                //Debug.Log("distribution: " + d);
                 int index = x + y * gridHeight;
 
                 double r = latticeGrid[index].density;
                 double g = latticeGrid[index].velocityX;
                 double b = latticeGrid[index].velocityY;
-                Color color = new Color((float)r / 5.0f, (float)g * 10.0f, (float)b * 10.0f);
+                Color color = new Color(1.0f / (float)r, 
+                    (0.5f + (float)g),
+                    (0.5f + (float)b));
                 //Color color = new Color((float)r / 5.0f, 0, 0);
                 outputTexture.SetPixel(x, y, color);
             }
@@ -342,121 +363,3 @@ public class LatticeGrid
         outputMaterial.mainTexture = outputTexture;
     }
 }
-
-
-//public void CollisionStep()
-//{
-//    for (int j = 0; j < gridHeight; j++)
-//    {
-//        for (int i = 0; i < gridWidth; i++)
-//        {
-//            // Compute rho and velocity
-//            double rho = 0.0;
-//            double velocityX = 0.0;
-//            double velocityY = 0.0;
-
-//            LatticeGridNode node = latticeGrid[i + j * gridWidth];
-
-//            for (int k = 0; k < 9; k++)
-//            {
-//                rho += node.distribution[k];
-//                velocityX += eX[k] * node.distribution[k];
-//                velocityY += eY[k] * node.distribution[k];
-//            }
-
-//            velocityX /= rho;
-//            velocityY /= rho;
-
-//            node.density = rho;
-//            node.velocityX = velocityX;
-//            node.velocityY = velocityY;
-
-//            // Compute equilibrium distribution
-//            double uSqr = velocityX * velocityX + velocityY * velocityY;
-//            double us = velocityX * eX[0] + velocityY * eY[0];
-//            double[] feq = new double[9];
-
-//            for (int k = 0; k < 9; k++)
-//            {
-//                double cu = eX[k] * velocityX + eY[k] * velocityY;
-//                double usq = eX[k] * eX[k] + eY[k] * eY[k];
-
-//                feq[k] = weights[k] * rho * (1.0 + 3.0 * cu / cSqr + 4.5 * cu * cu / (cSqr * cSqr) - 1.5 * uSqr / cSqr);
-//            }
-
-//            // Collision step
-//            for (int k = 0; k < 9; k++)
-//            {
-//                node.distribution[k] += relaxationFactor * (feq[k] - node.distribution[k]);
-//            }
-//        }
-//    }
-//}
-
-
-//private void StreamingStep()
-//{
-//    // Create a temporary distribution grid to perform streaming
-//    LatticeGridNode[] tempGrid = new LatticeGridNode[gridWidth * gridHeight];
-//    for (int i = 0; i < gridWidth * gridHeight; i++)
-//    {
-//        tempGrid[i] = new LatticeGridNode();
-//    }
-
-//    // Perform streaming on all nodes
-//    for (int y = 0; y < gridHeight; y++)
-//    {
-//        for (int x = 0; x < gridWidth; x++)
-//        {
-//            // Calculate the index of the current node in the 1D grid
-//            int currentIndex = x + y * gridWidth;
-
-//            // Stream the distributions to their new locations
-//            for (int i = 0; i < 9; i++)
-//            {
-//                // Calculate the new x and y position of the distribution
-//                int newX = x + (int)eX[i];
-//                int newY = y + (int)eY[i];
-
-//                // Periodic boundary conditions
-//                if (newX < 0)
-//                {
-//                    newX += gridWidth;
-//                }
-//                else if (newX >= gridWidth)
-//                {
-//                    newX -= gridWidth;
-//                }
-
-//                if (newY < 0)
-//                {
-//                    newY += gridHeight;
-//                }
-//                else if (newY >= gridHeight)
-//                {
-//                    newY -= gridHeight;
-//                }
-
-//                // Calculate the index of the new node in the 1D grid
-//                int newIndex = newX + newY * gridWidth;
-
-//                // Stream the distribution to the new location
-//                tempGrid[newIndex].distribution[i] = latticeGrid[currentIndex].distribution[i];
-//            }
-
-//            // Copy the macroscopic variables to the new node
-//            tempGrid[currentIndex].density = latticeGrid[currentIndex].density;
-//            tempGrid[currentIndex].velocityX = latticeGrid[currentIndex].velocityX;
-//            tempGrid[currentIndex].velocityY = latticeGrid[currentIndex].velocityY;
-//        }
-//    }
-
-//    // Update the lattice grid with the streamed values
-//    for (int i = 0; i < gridWidth * gridHeight; i++)
-//    {
-//        latticeGrid[i].distribution = tempGrid[i].distribution;
-//        latticeGrid[i].density = tempGrid[i].density;
-//        latticeGrid[i].velocityX = tempGrid[i].velocityX;
-//        latticeGrid[i].velocityY = tempGrid[i].velocityY;
-//    }
-//}
