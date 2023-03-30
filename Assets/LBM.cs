@@ -7,18 +7,21 @@ using UnityEngine;
 // 1?. Kleuren zijn verticale strepen, als je in zoomt. Mogelijk gwn bug in Unity
 //      * Groen = verticale strepen
 //      * Blauw = horizontaal
-// 
+// 2. Extreem instabiel voor sommige densities. Debug log parameters, wanneer extreme waardes / verschil in waardes gemaakt worden
 
 // Todo:
-// 1. Alles
-
+// 1. Boundaries toevoegen
+// 2. Nozzle generator toevoegen
+// 3. Thrust meter toevoegen
 
 public class LBM : MonoBehaviour
 {
     public const int WIDTH = 256;
     public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
-    public const double RELAXATION_TIME = 1.0f; // 0.1f en waarschijnlijk alles onder 1 breekt de simulatie 
+    public const double RELAXATION_TIME = 1.0;
+
+    public const double baseDensity = 0.1;
 
     public LatticeGrid Grid;
 
@@ -26,8 +29,8 @@ public class LBM : MonoBehaviour
 
     void Start()
     {
-        this.Grid = new LatticeGrid(WIDTH, HEIGHT, /* VISCOSITY, */ RELAXATION_TIME);
-        //this.Grid.TestInitialize();
+        this.Grid = new LatticeGrid(WIDTH, HEIGHT, /* VISCOSITY, */ RELAXATION_TIME, baseDensity);
+        this.Grid.AddCylinder(80, 80, 30, 0.5); // Dit fuckt t hele ding (bij density 0.5+, maar vooral als de achtergrond density 0.1 is)
     }
 
     void Update()
@@ -40,7 +43,7 @@ public class LBM : MonoBehaviour
     }
 }
 
-// `rho` is de "macroscopic density" van de vloeistof op elke lattice
+// `rho` is de "macroscopic density" van de vloeistof op elke cell
 // `tau` is de "relaxation time" van de vloeistof in het algemeen.
 
 public class LatticeGridNode
@@ -63,16 +66,24 @@ public class LatticeGridNode
             distribution[i] = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
         }
     }
+
+    public void AddDensity(double density)
+    {
+        for (int i = 0; i < 9; i++)
+        {
+            distribution[i] += LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
+        }
+    }
 }
 
 public class LatticeGrid
 {
     // Test variables
     public double sumDensity = 0.0;
-    public double minDensity = 0.0;
+    public double minDensity = Mathf.Infinity;
+    public double maxDensity = -Mathf.Infinity;
 
-
-    // 
+    // LBM 
     private int gridWidth;
     private int gridHeight;
     private double relaxationTime;
@@ -89,7 +100,7 @@ public class LatticeGrid
         1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0 
     };
 
-    public LatticeGrid(int width, int height, /* double viscosity, */ double tau)
+    public LatticeGrid(int width, int height, /* double viscosity, */ double tau, double baseDensity)
     {
         gridWidth = width;
         gridHeight = height;
@@ -97,10 +108,21 @@ public class LatticeGrid
         relaxationFactor = 1.0 / tau;
         cSqr = 1.0 / 3.0;
 
-        Initialize2();
+        //Initialize(baseDensity);
+        InitializeRandom();
     }
 
-    public void Initialize()
+    public void Initialize(double density)
+    {
+        latticeGrid = new LatticeGridNode[gridWidth * gridHeight];
+
+        for (int i = 0; i < gridWidth * gridHeight; i++)
+        {
+            latticeGrid[i] = new LatticeGridNode(density, 0.0, 0.0);
+        }
+    }
+
+    public void InitializeLine()
     {
         latticeGrid = new LatticeGridNode[gridWidth * gridHeight];
 
@@ -117,65 +139,44 @@ public class LatticeGrid
         }
     }
 
-    private void Initialize2()
+    private void InitializeRandom()
     {
         latticeGrid = new LatticeGridNode[gridWidth * gridHeight];
 
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
-            double r = Random.Range(0.1f, 5.0f);
+            double r = (double)Random.Range(0.1f, 0.5f);
             latticeGrid[i] = new LatticeGridNode(r, 0.0, 0.0);
         }
     }
 
-    public void TestInitialize()
+    /// <summary>
+    /// Fuck fuck fuck fuck
+    /// </summary>
+    /// <param name="xPosition"></param>
+    /// <param name="yPosition"></param>
+    /// <param name="r"></param>
+    /// <param name="density"></param>
+    public void AddCylinder(int xPosition, int yPosition, int r, double density)
     {
-        for(int x = 0; x < 70; x++)
+        Debug.Log("AddCylinder()");
+        for(int x = 0; x < gridWidth; x++)
         {
-            for(int y = 0; y < 70; y++)
+            for(int y = 0; y < gridHeight; y++)
             {
-                this.latticeGrid[x + y * gridHeight].distribution[1] = 0.1f;
-                //this.latticeGrid[x * y].density = 1000f;
-            }
-        }
-        //this.latticeGrid[40 * 40].density = 1.0f;
-    }
+                int dx = x - xPosition;
+                int dy = y - yPosition;
 
-    public void TestInitialize2()
-    {
-        for (int x = 0; x < 70; x++)
-        {
-            for (int y = 0; y < 70; y++)
-            {
-                for(int k = 0; k < 9; k++)
+                float distanceSquare = dx * dx + dy * dy;
+                bool inCylinder = distanceSquare <= r * r;
+
+                if (inCylinder)
                 {
-                    float randomValue = Random.Range(0.0f, 1.0f);
-                    this.latticeGrid[x + y * gridHeight].distribution[k] = randomValue;
+                    int index = x + y * gridHeight;
+                    latticeGrid[index].AddDensity(density);
                 }
-                
-                //this.latticeGrid[x * y].density = 1000f;
             }
         }
-        //this.latticeGrid[40 * 40].density = 1.0f;
-    }
-
-    public void TestInitialize3()
-    {
-        for (int x = 0; x < gridWidth; x++)
-        {
-            for (int y = 0; y < gridHeight; y++)
-            {
-                for (int k = 0; k < 9; k++)
-                {
-                    //float randomValue = Random.Range(0.0f, 1.0f);
-                    this.latticeGrid[x + y * gridHeight].distribution[k] = Mathf.Abs(Mathf.Sin(k * 37.0f));
-                    //Debug.Log(this.latticeGrid[x + y * gridHeight].distribution[k]);
-                }
-
-                //this.latticeGrid[x * y].density = 1000f;
-            }
-        }
-        //this.latticeGrid[40 * 40].density = 1.0f;
     }
 
     public void CollisionStep()
@@ -209,14 +210,13 @@ public class LatticeGrid
 
                 sumDensity += rho;
 
-                // Compute equilibrium distribution (aangepast, zonder verandering in resultaat)
+                // Compute equilibrium distribution
                 double[] feq = new double[9];
                 for (int k = 0; k < 9; k++)
                 {
                     feq[k] = EquilibriumFunction(rho, velocityX, velocityY, k);
                 }
 
-                
                 // Collision step
                 for (int k = 0; k < 9; k++)
                 {
@@ -257,7 +257,7 @@ public class LatticeGrid
         // Calculate the equilibrium distribution function for the given velocity component
         //double feq = rho * weight * (1.0 + (3.0 * udotcx) + (4.5 * udotcx * udotcx) - (1.5 * (ux * ux + uy * uy) * cSqr)); // originele
 
-        double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT!
+        double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT! niet altijd :(
 
         return feq;
     }
@@ -348,10 +348,10 @@ public class LatticeGrid
                 double r = latticeGrid[index].density;
                 double g = latticeGrid[index].velocityX;
                 double b = latticeGrid[index].velocityY;
-                Color color = new Color(1.0f / (float)r, 
-                    (0.5f + (float)g),
-                    (0.5f + (float)b));
-                //Color color = new Color((float)r / 5.0f, 0, 0);
+                //Color color = new Color(1.0f / (float)r,
+                //    (0.5f + (float)g),
+                //    (0.5f + (float)b));
+                Color color = new Color((float)r, 0, 0);
                 outputTexture.SetPixel(x, y, color);
             }
         }
