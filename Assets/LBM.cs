@@ -1,4 +1,4 @@
-//using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,6 +8,15 @@ using UnityEngine;
 //      * Groen = verticale strepen
 //      * Blauw = horizontaal
 // 2. Extreem instabiel voor sommige densities. Debug log parameters, wanneer extreme waardes / verschil in waardes gemaakt worden
+//      * Dit kan gebeuren wanneer verschil tussen x en y snelheid 0.8165 is. HOUD 0.73 AAN IPV 0.8165!!!
+//      * Zolang de velocity in zowel de x als y richting niet groter is dan 0.407 zou de simulatie moeten blijven werken (4.226 zou misschien ook kunnen werken)
+//      * 0 < vel.x < 0.73 && vel.y = 0.73 - vel.x        werkt
+//      * 0 < vel.y < 0.73 && vel.x = 0.73 - vel.y        werkt
+//      * abs(vel.x - vel.y) < 0.73 
+//      * https://www.desmos.com/calculator/foa5ikbgrz      (eigen berekeningen)
+//      * https://arxiv.org/pdf/2006.07353.pdf              (paper van andere universiteit)
+//          - Ma > sqrt(3) − 1 ~= 0.73        (hoort een streepje boven Ma)
+//          - Gemiddeld Mach getal
 
 // Todo:
 // 1. Boundaries toevoegen
@@ -19,7 +28,8 @@ public class LBM : MonoBehaviour
     public const int WIDTH = 256;
     public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
-    public const double RELAXATION_TIME = 1.0;
+    public const double viscosity = 0.000017; // Lucht op 20km hoogte
+    public const double RELAXATION_TIME = 20.0; //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
 
     public const double baseDensity = 0.1;
 
@@ -35,11 +45,10 @@ public class LBM : MonoBehaviour
 
     void Update()
     {
+        //this.Grid.AddCylinder(80, 80, 30, 0.5);
         this.Grid.CollisionStep();
         this.Grid.StreamingStep();
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
-
-        Debug.Log("Frame done");
     }
 }
 
@@ -145,7 +154,7 @@ public class LatticeGrid
 
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
-            double r = (double)Random.Range(0.1f, 0.5f);
+            double r = (double)UnityEngine.Random.Range(0.1f, 0.5f);
             latticeGrid[i] = new LatticeGridNode(r, 0.0, 0.0);
         }
     }
@@ -215,28 +224,19 @@ public class LatticeGrid
                 for (int k = 0; k < 9; k++)
                 {
                     feq[k] = EquilibriumFunction(rho, velocityX, velocityY, k);
+
+                    //if(feq[k] < 0)
+                    //{
+                    //    Debug.Log("Feq: " + feq[k] + "; Rho: " + rho + "; VelX: " + velocityX + "; velY: " + velocityY + "; K: " + k);
+                    //}
                 }
 
                 // Collision step
                 for (int k = 0; k < 9; k++)
                 {
                     //node.distribution[k] += relaxationFactor * (feq[k] - node.distribution[k]); // originele
-
+                    
                     node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];
-                }
-
-                // Debug
-                if (i == 40 && j == 40)
-                {
-                    double newRho = 0.0;
-
-                    for (int k = 0; k < 9; k++)
-                    {
-                        newRho += node.distribution[k];
-                    }
-
-                    Debug.Log("Previous Rho: " + rho);
-                    Debug.Log("NewRho: " + newRho);
                 }
             }
         }
@@ -319,8 +319,6 @@ public class LatticeGrid
             }
         }
 
-        sumDensity = 0.0;
-
         // Update the lattice grid with the streamed values
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
@@ -328,11 +326,7 @@ public class LatticeGrid
             latticeGrid[i].density = tempGrid[i].density;
             latticeGrid[i].velocityX = tempGrid[i].velocityX;
             latticeGrid[i].velocityY = tempGrid[i].velocityY;
-
-            sumDensity += tempGrid[i].density;
         }
-
-        Debug.Log("Streaming Density: " + sumDensity);
     }
 
     public void UpdateDisplayTexture(int width, int height, ref Material outputMaterial)
@@ -348,10 +342,10 @@ public class LatticeGrid
                 double r = latticeGrid[index].density;
                 double g = latticeGrid[index].velocityX;
                 double b = latticeGrid[index].velocityY;
-                //Color color = new Color(1.0f / (float)r,
-                //    (0.5f + (float)g),
-                //    (0.5f + (float)b));
-                Color color = new Color((float)r, 0, 0);
+                Color color = new Color(1.0f / (float)r,
+                    (0.5f + (float)g),
+                    (0.5f + (float)b));
+                //Color color = new Color((float)r, 0, 0);
                 outputTexture.SetPixel(x, y, color);
             }
         }
