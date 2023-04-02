@@ -44,7 +44,7 @@ public class LBM : MonoBehaviour
     void Start()
     {
         this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity);
-        this.Grid.AddCylinder(80, 80, 30, 1.0);
+        this.Grid.AddCylinder(40, 40, 30, 1.0);
     }
 
     void Update()
@@ -143,7 +143,8 @@ public class LatticeGrid
 
     public bool IsPartOfNozzle(int x, int y)
     {
-        return false;
+        return IsInCylinder(x, y, 80, 80, 20);
+        //return false;
     }
 
     public bool IsSolid(int x, int y)
@@ -382,21 +383,28 @@ public class LatticeGrid
                     }
 
                     // Calculate the index of the new node in the 1D grid
-                    int newIndex = newX + newY * gridWidth;
-
+                    int newIndex = newX + newY * gridHeight;
                     
+                    // !!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    // BOUNCE-BACK WAARSCHIJNLIJK NIET GOED GEDAAN
                     if (IsSolid(newX, newY))
                     {
                         // Solid boundary bounce-back
                         int oppositeIndex = bounceBack[i];
-                        newX = (newX + (int)eX[oppositeIndex] * 2) % gridWidth;
-                        newY = (newY + (int)eY[oppositeIndex] * 2) % gridHeight;
+                        (tempGrid[currentIndex] as FluidLatticeNode).distribution[oppositeIndex] = (latticeGrid[currentIndex] as FluidLatticeNode).distribution[i];
+                        //newX = (newX + (int)eX[oppositeIndex] * 2) % gridWidth;
+                        //newY = (newY + (int)eY[oppositeIndex] * 2) % gridHeight;
 
-                        newIndex = newX + newY * gridWidth;
+                        //newIndex = newX + newY * gridWidth;
                     }
+                    // !!!!!!!!!!!!!!!!!
+                    else // WAARSCHIJNLIJK NIET GOED!!!!!
+                    {
+                        // Stream the distribution to the new location
+                        (tempGrid[newIndex] as FluidLatticeNode).distribution[i] = (latticeGrid[currentIndex] as FluidLatticeNode).distribution[i];
+                    }
+                    // !!!!!!!!!!!!!!!!
                     
-                    // Stream the distribution to the new location
-                    (tempGrid[newIndex] as FluidLatticeNode).distribution[i] = (latticeGrid[currentIndex] as FluidLatticeNode).distribution[i];
                 }
 
                 // Copy the macroscopic variables to the new node
@@ -422,12 +430,6 @@ public class LatticeGrid
                 (latticeGrid[index] as FluidLatticeNode).velocityY = (tempGrid[index] as FluidLatticeNode).velocityY;
             }
         }
-        
-        //for (int i = 0; i < gridWidth * gridHeight; i++)
-        //{
-        //    if(IsSolid())
-            
-        //}
     }
 
     public void UpdateDisplayTexture(int width, int height, ref Material outputMaterial)
