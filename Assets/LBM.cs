@@ -17,12 +17,14 @@ using UnityEngine;
 //      * https://arxiv.org/pdf/2006.07353.pdf              (paper van andere universiteit)
 //          - Ma > sqrt(3) − 1 ~= 0.73        (hoort een streepje boven Ma)
 //          - Gemiddeld Mach getal
+//      * https://www.reddit.com/r/CFD/comments/128x7uq/latticeboltzmann_unstable/?utm_source=share&utm_medium=web2x&context=3 
 
 // Todo:
 // 1. Variabele zoals de afstand tussen cells in (dx), de velocity tussen 2 cells in (c), en viscosity toevoegen
 // 2. Boundaries toevoegen
 // 3. Nozzle generator toevoegen
 // 4. Thrust meter toevoegen
+// 5. Array 2d maken (huidige implementatie is veelste traag)
 
 
 public class LBM : MonoBehaviour
@@ -41,8 +43,8 @@ public class LBM : MonoBehaviour
 
     void Start()
     {
-        this.Grid = new LatticeGrid(WIDTH, HEIGHT, /* VISCOSITY, */ RELAXATION_TIME, baseDensity);
-        this.Grid.AddCylinder(80, 80, 30, 1.0); // Dit fuckt t hele ding (bij density 0.5+, maar vooral als de achtergrond density 0.1 is)
+        this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity);
+        this.Grid.AddCylinder(80, 80, 30, 1.0);
     }
 
     void Update()
@@ -119,7 +121,7 @@ public class LatticeGrid
         1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0 
     };
 
-    public LatticeGrid(int width, int height, /* double viscosity, */ double tau, double baseDensity)
+    public LatticeGrid(int width, int height, double tau, double baseDensity)
     {
         gridWidth = width;
         gridHeight = height;
@@ -169,13 +171,6 @@ public class LatticeGrid
         }
     }
 
-    /// <summary>
-    /// Fuck fuck fuck fuck
-    /// </summary>
-    /// <param name="xPosition"></param>
-    /// <param name="yPosition"></param>
-    /// <param name="r"></param>
-    /// <param name="density"></param>
     public void AddCylinder(int xPosition, int yPosition, int r, double density)
     {
         Debug.Log("AddCylinder()");
