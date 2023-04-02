@@ -19,9 +19,11 @@ using UnityEngine;
 //          - Gemiddeld Mach getal
 
 // Todo:
-// 1. Boundaries toevoegen
-// 2. Nozzle generator toevoegen
-// 3. Thrust meter toevoegen
+// 1. Variabele zoals de afstand tussen cells in (dx), de velocity tussen 2 cells in (c), en viscosity toevoegen
+// 2. Boundaries toevoegen
+// 3. Nozzle generator toevoegen
+// 4. Thrust meter toevoegen
+
 
 public class LBM : MonoBehaviour
 {
@@ -29,9 +31,9 @@ public class LBM : MonoBehaviour
     public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
     public const double viscosity = 0.000017; // Lucht op 20km hoogte
-    public const double RELAXATION_TIME = 20.0; //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
+    public const double RELAXATION_TIME = 0.53; //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
 
-    public const double baseDensity = 0.1;
+    public const double baseDensity = 1.0;
 
     public LatticeGrid Grid;
 
@@ -40,38 +42,46 @@ public class LBM : MonoBehaviour
     void Start()
     {
         this.Grid = new LatticeGrid(WIDTH, HEIGHT, /* VISCOSITY, */ RELAXATION_TIME, baseDensity);
-        this.Grid.AddCylinder(80, 80, 30, 0.5); // Dit fuckt t hele ding (bij density 0.5+, maar vooral als de achtergrond density 0.1 is)
+        this.Grid.AddCylinder(80, 80, 30, 1.0); // Dit fuckt t hele ding (bij density 0.5+, maar vooral als de achtergrond density 0.1 is)
     }
 
     void Update()
     {
         //this.Grid.AddCylinder(80, 80, 30, 0.5);
-        this.Grid.CollisionStep();
-        this.Grid.StreamingStep();
+        this.Grid.Step();
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
     }
 }
 
 // `rho` is de "macroscopic density" van de vloeistof op elke cell
-// `tau` is de "relaxation time" van de vloeistof in het algemeen.
+// `tau` is de "kinematic viscosity / timescale / relaxation time" van de vloeistof in het algemeen.
 
 public class LatticeGridNode
 {
+    // If the node should be able to hold a fluid / gas
+    public bool isSolid;
+
     // macroscopic variables
     public double density;
     public double velocityX;
     public double velocityY;
-    // distribution functions
+    // distribution values
     public double[] distribution;
 
     public LatticeGridNode(double density = 0.0f, double velocityX = 0.0f, double velocityY = 0.0f)
     {
+        // Dont initialize anything when the cell is solid
+        if (isSolid)
+            return;
+
+        // Initialize base fluid properties
         this.density = density; // Only used to display result
         this.velocityX = velocityX; // Only used to display result
         this.velocityY = velocityY; // Only used to display result
         this.distribution = new double[9]; // Only factor with influence in the function
         for(int i = 0; i < 9; i++)
         {
+            //distribution[i] = 1 + (double)UnityEngine.Random.Range(0.0f, 1.0f); //(double)UnityEngine.Random.Range(0.0f, 0.01f);
             distribution[i] = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
         }
     }
@@ -154,7 +164,7 @@ public class LatticeGrid
 
         for (int i = 0; i < gridWidth * gridHeight; i++)
         {
-            double r = (double)UnityEngine.Random.Range(0.1f, 0.5f);
+            double r = (double)UnityEngine.Random.Range(0.5f, 1.0f);
             latticeGrid[i] = new LatticeGridNode(r, 0.0, 0.0);
         }
     }
@@ -188,9 +198,15 @@ public class LatticeGrid
         }
     }
 
+    public void Step()
+    {
+        this.CollisionStep();
+        this.StreamingStep();
+    }
+
     public void CollisionStep()
     {
-        sumDensity = 0.0;
+        sumDensity = 0.0; // Debug value
 
         for (int j = 0; j < gridHeight; j++)
         {
@@ -224,19 +240,17 @@ public class LatticeGrid
                 for (int k = 0; k < 9; k++)
                 {
                     feq[k] = EquilibriumFunction(rho, velocityX, velocityY, k);
-
-                    //if(feq[k] < 0)
-                    //{
-                    //    Debug.Log("Feq: " + feq[k] + "; Rho: " + rho + "; VelX: " + velocityX + "; velY: " + velocityY + "; K: " + k);
-                    //}
                 }
 
                 // Collision step
                 for (int k = 0; k < 9; k++)
                 {
+                    // Original
                     //node.distribution[k] += relaxationFactor * (feq[k] - node.distribution[k]); // originele
-                    
-                    node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];
+                    // Compute shader (1 of 3)
+                    //node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];  
+                    // Python
+                    node.distribution[k] = node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]);
                 }
             }
         }
@@ -255,9 +269,14 @@ public class LatticeGrid
         double udotcx = ux * cx + uy * cy;
 
         // Calculate the equilibrium distribution function for the given velocity component
+        // Original
         //double feq = rho * weight * (1.0 + (3.0 * udotcx) + (4.5 * udotcx * udotcx) - (1.5 * (ux * ux + uy * uy) * cSqr)); // originele
-
-        double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT! niet altijd :(
+        // Compute shader version (1 of 3)
+        //double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT! niet altijd :(
+        // Python
+        double feq = rho * weight * (
+                1 + 3 * (ux * cx + uy * cy) + 9 * Math.Pow((ux * cx + uy * cy), 2) / 2 - 3 * (Math.Pow(ux, 2) + Math.Pow(uy, 2)) / 2
+            );
 
         return feq;
     }
@@ -340,12 +359,22 @@ public class LatticeGrid
                 int index = x + y * gridHeight;
 
                 double r = latticeGrid[index].density;
-                double g = latticeGrid[index].velocityX;
-                double b = latticeGrid[index].velocityY;
-                Color color = new Color(1.0f / (float)r,
-                    (0.5f + (float)g),
-                    (0.5f + (float)b));
-                //Color color = new Color((float)r, 0, 0);
+                //double g = latticeGrid[index].velocityX;
+                //double b = latticeGrid[index].velocityY;
+                
+                Color color;
+                if(latticeGrid[index].isSolid)
+                {
+                    color = Color.black;
+                }
+                else
+                {
+                    //Color color = new Color(10.0f / (float)r,
+                    //    (0.5f + (float)g),
+                    //    (0.5f + (float)b));
+                    //Color color = new Color(1.0f / (float)r, 0, 0);
+                    color = GenerateDensityColor(r);
+                }
                 outputTexture.SetPixel(x, y, color);
             }
         }
@@ -355,5 +384,14 @@ public class LatticeGrid
         outputTexture.Apply();
 
         outputMaterial.mainTexture = outputTexture;
+    }
+
+    public Color GenerateDensityColor(double density)
+    {
+        float r = (float)density / 2.0f;
+        float g = r / 2.0f;
+        float b = g / 2.0f;
+
+        return new Color(r, g, b);
     }
 }
