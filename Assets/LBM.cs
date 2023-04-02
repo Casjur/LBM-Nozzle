@@ -50,6 +50,8 @@ public class LBM : MonoBehaviour
     void Update()
     {
         //this.Grid.AddCylinder(80, 80, 30, 0.5);
+        //this.Grid.AddCylinder(40, 40, 30, .01);
+        //this.Grid.MaintainCylinder(40, 40, 30, 1.0);
         this.Grid.Step();
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
     }
@@ -61,6 +63,7 @@ public class LBM : MonoBehaviour
 public interface LatticeGridNode
 {
     public void AddDensity(double density);
+    public void SetDensity(double density);
 }
 
 public class FluidLatticeNode : LatticeGridNode
@@ -86,6 +89,14 @@ public class FluidLatticeNode : LatticeGridNode
         }
     }
 
+    public void SetDensity(double density)
+    {
+        for(int i = 0; i < 9; i++)
+        {
+            distribution[i] = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
+        }
+    }
+
     public void AddDensity(double density)
     {
         for (int i = 0; i < 9; i++)
@@ -100,6 +111,11 @@ public class SolidLatticeNode : LatticeGridNode
     public void AddDensity(double density)
     {
         // Do nothing, since the node does not contain liquid
+        return;
+    }
+
+    public void SetDensity(double density)
+    {
         return;
     }
 }
@@ -143,7 +159,7 @@ public class LatticeGrid
 
     public bool IsPartOfNozzle(int x, int y)
     {
-        return IsInCylinder(x, y, 80, 80, 20);
+        return IsInCylinder(x, y, 120, 80, 20);
         //return false;
     }
 
@@ -227,6 +243,22 @@ public class LatticeGrid
         }
     }
 
+    public void MaintainCylinder(int xPosition, int yPosition, int r, double density)
+    {
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                bool inCylinder = IsInCylinder(x, y, xPosition, yPosition, r);
+
+                if (inCylinder)
+                {
+                    int index = x + y * gridHeight;
+                    latticeGrid[index].SetDensity(density);
+                }
+            }
+        }
+    }
     public bool IsInCylinder(int x, int y, int cylinderX, int cylinderY, int r)
     {
         int dx = x - cylinderX;
