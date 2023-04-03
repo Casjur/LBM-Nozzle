@@ -314,4 +314,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e43e16483315bd4887e299ab9f4a439, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  nozzleDensity: 0.001
   outputMaterial: {fileID: 2100000, guid: 501fc766c7167d34a830cf4a6e30853e, type: 2}

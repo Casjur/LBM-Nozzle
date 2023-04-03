@@ -21,7 +21,6 @@ using UnityEngine;
 
 // Todo:
 // 1. Variabele zoals de afstand tussen cells in (dx), de velocity tussen 2 cells in (c), en viscosity toevoegen
-// 2. Boundaries toevoegen
 // 3. Nozzle generator toevoegen
 // 4. Thrust meter toevoegen
 // 5. Array 2d maken (huidige implementatie is veelste traag)
@@ -29,22 +28,33 @@ using UnityEngine;
 
 public class LBM : MonoBehaviour
 {
-    public const int WIDTH = 256;
-    public const int HEIGHT = 256;
+    public const int WIDTH = 512;//256;
+    public const int HEIGHT = 512; //256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
-    public const double viscosity = 0.000017; // Lucht op 20km hoogte
-    public const double RELAXATION_TIME = 0.53; //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
+    //public const double viscosity = 0.000017; // Lucht op 20km hoogte
+    public const double RELAXATION_TIME = 8.0; //1.0 // Min: 0.53 Max: geen? //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
 
     public const double baseDensity = 1.0;
 
     public LatticeGrid Grid;
 
+    public Nozzle nozzle;
+    public double nozzleDensity = 1.0;
+
+    public int NozzleX = 20;
+    public int NozzleY = 180;
+    public int NozzleLineRadius = 3;
+    public int CombChamRadius = 20;
+    public int CombChamLength = 70;
+
     public Material outputMaterial;
 
     void Start()
     {
-        this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity);
-        this.Grid.AddCylinder(40, 40, 30, 1.0);
+        this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, 0, 0, 0);
+        this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity, nozzle);
+        this.nozzle.grid = this.Grid;
+        //this.Grid.AddCylinder(40, 40, 30, 1.0);
     }
 
     void Update()
@@ -52,7 +62,9 @@ public class LBM : MonoBehaviour
         //this.Grid.AddCylinder(80, 80, 30, 0.5);
         //this.Grid.AddCylinder(40, 40, 30, .01);
         //this.Grid.MaintainCylinder(40, 40, 30, 1.0);
+        this.nozzle.UpdateCombustionChamber(nozzleDensity);
         this.Grid.Step();
+
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
     }
 }
@@ -63,6 +75,7 @@ public class LBM : MonoBehaviour
 public interface LatticeGridNode
 {
     public void AddDensity(double density);
+    public void AddDensityInDirection(double density, int distributionIndex);
     public void SetDensity(double density);
 }
 
@@ -104,6 +117,19 @@ public class FluidLatticeNode : LatticeGridNode
             distribution[i] += LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
         }
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="density"></param>
+    /// <param name="i"> distribution index (describes direcition of the density) </param>
+    public void AddDensityInDirection(double density, int i)
+    {
+        //double d = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
+        //Debug.Log("d: " + d);
+        distribution[i] += density; //d;
+        
+    }
 }
 
 public class SolidLatticeNode : LatticeGridNode
@@ -118,22 +144,30 @@ public class SolidLatticeNode : LatticeGridNode
     {
         return;
     }
+
+    public void AddDensityInDirection(double density, int distributionIndex)
+    {
+        return;
+    }
+
 }
 
 public class LatticeGrid
 {
+    public Nozzle nozzle;
+
     // Test variables
     public double sumDensity = 0.0;
     public double minDensity = Mathf.Infinity;
     public double maxDensity = -Mathf.Infinity;
 
     // LBM 
-    private int gridWidth;
-    private int gridHeight;
-    private double relaxationTime;
-    private double relaxationFactor;
-    private double cSqr;
-    private LatticeGridNode[] latticeGrid;
+    public readonly int gridWidth;
+    public readonly int gridHeight;
+    public readonly double relaxationTime;
+    public readonly double relaxationFactor;
+    public readonly double c2;
+    public LatticeGridNode[] latticeGrid { get; private set; }
 
     // Lattice constants
     public static readonly double[] eX = { 0, 1, 0, -1, 0, 1, -1, -1, 1 }; // x direction of distribution at index
@@ -145,13 +179,15 @@ public class LatticeGrid
     };
     public static readonly int[] bounceBack = { 0, 3, 4, 1, 2, 7, 8, 5, 6 }; // index of the opposite direction for each direction
 
-    public LatticeGrid(int width, int height, double tau, double baseDensity)
+    public LatticeGrid(int width, int height, double tau, double baseDensity, Nozzle nozzle)
     {
         gridWidth = width;
         gridHeight = height;
         relaxationTime = tau;
         relaxationFactor = 1.0 / tau;
-        cSqr = 1.0 / 3.0;
+        c2 = 1.0 / 3.0;
+
+        this.nozzle = nozzle;
 
         //Initialize(baseDensity);
         InitializeRandom();
@@ -159,8 +195,39 @@ public class LatticeGrid
 
     public bool IsPartOfNozzle(int x, int y)
     {
-        return IsInCylinder(x, y, 120, 80, 20);
-        //return false;
+        //return IsOnNozzleShape(50.0, 100.0, 20.0, x, y);
+        return this.nozzle.IsOnNozzle(x, y);
+        //return IsInCylinder(x, y, 200, 80, 20);
+    }
+
+    public static bool IsOnNozzleShape(double throatRadius, double exitRadius, double expansionRatio, double x, double y)
+    {
+        double throatLength = throatRadius / Math.Sqrt(expansionRatio - 1);
+        double exitLength = exitRadius / Math.Sqrt(expansionRatio - 1);
+
+        double lengthRatio = exitLength / throatLength;
+        double halfLengthRatio = Math.Sqrt(lengthRatio);
+
+        double invHalfLengthRatio = 1.0 / halfLengthRatio;
+        double halfExpansionRatio = Math.Sqrt(expansionRatio);
+
+        double xThroat = 0;
+        double yThroat = 0;
+        double xExit = lengthRatio;
+        double yExit = 0;
+
+        if (x < xThroat || x > xExit)
+        {
+            return false;
+        }
+
+        double eta = Math.Sqrt(x / lengthRatio);
+        double theta = 2 * Math.Atan(halfLengthRatio * Math.Tan(halfExpansionRatio * Math.Atan(eta / invHalfLengthRatio)) / invHalfLengthRatio);
+        double yi = throatRadius * Math.Sin(theta);
+
+        double tolerance = 2;
+
+        return Math.Abs(y - yi) < tolerance;
     }
 
     public bool IsSolid(int x, int y)
@@ -344,13 +411,13 @@ public class LatticeGrid
 
         // Calculate the equilibrium distribution function for the given velocity component
         // Original
-        //double feq = rho * weight * (1.0 + (3.0 * udotcx) + (4.5 * udotcx * udotcx) - (1.5 * (ux * ux + uy * uy) * cSqr)); // originele
+        //double feq = rho * weight * (1.0 + (3.0 * udotcx) + (4.5 * udotcx * udotcx) - (1.5 * (ux * ux + uy * uy) * c2)); // originele
         // Compute shader version (1 of 3)
-        //double feq = weight * rho * (1.0 + udotcx / cSqr + 0.5 * (udotcx / cSqr) * (udotcx / cSqr) - (ux * ux + uy * uy) / (2.0 * cSqr)); // WERKT! niet altijd :(
+        double feq = weight * rho * (1.0 + udotcx / c2 + 0.5 * (udotcx / c2) * (udotcx / c2) - (ux * ux + uy * uy) / (2.0 * c2)); // WERKT! niet altijd :(
         // Python
-        double feq = rho * weight * (
-                1 + 3 * (ux * cx + uy * cy) + 9 * Math.Pow((ux * cx + uy * cy), 2) / 2 - 3 * (Math.Pow(ux, 2) + Math.Pow(uy, 2)) / 2
-            );
+        //double feq = rho * weight * (
+        //        1 + 3 * (ux * cx + uy * cy) + 9 * Math.Pow((ux * cx + uy * cy), 2) / 2 - 3 * (Math.Pow(ux, 2) + Math.Pow(uy, 2)) / 2
+        //    );
 
         return feq;
     }
@@ -511,4 +578,104 @@ public class LatticeGrid
 
         return new Color(r, g, b);
     }
+}
+
+public class Nozzle
+{
+    public LatticeGrid grid;
+
+    public int x;
+    public int y;
+    private int lineRadius; // radius of a solid point / line
+    private int combustionChamberRadius;
+    private int combustionChamberLength;
+    private int throatRadius;
+    private int curve;
+    private int exitRadius;
+
+    public Nozzle(int x, int y, int lineRadius, int combustChamberRadius, int combustChamberLength, int throatRadius, int curve, int exitRadius)
+    {
+        this.x = x;
+        this.y = y;
+        this.lineRadius = lineRadius;
+        this.combustionChamberRadius = combustChamberRadius;
+        this.combustionChamberLength = combustChamberLength;
+        this.throatRadius = throatRadius;
+        this.curve = curve;
+        this.exitRadius = exitRadius;
+    }
+
+    public bool IsOnNozzle(int x, int y)
+    {
+        int minX = this.x;
+        int maxCombChamX = this.x + this.combustionChamberLength;
+        int minY = this.y - this.combustionChamberRadius;
+        int maxY = this.y + this.combustionChamberRadius;
+
+        // Combustion chamber
+        if (x < (minX - this.lineRadius))
+            return false; // Point is behind nozzle and chamber
+
+        // Check 2 horizontal lines
+        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, minY))
+            return true;
+
+        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, maxY))
+            return true;
+
+        // Check if on the back of the combustion chamber
+        if (IsOnVerticalLine(x, y, minX, maxY, minY))
+            return true;
+
+        //if (IsOnVerticalLine(x, y, maxCombChamX, maxY, minY))
+        //    return true;
+
+        // Converging
+
+        // Diverging
+        return false;
+    }
+
+    private bool IsOnHorizontalLine(int x, int y, int lineXLeft, int lineXRight, int lineY)
+    {
+        if(y < lineY + this.lineRadius && y > lineY - this.lineRadius)
+        {
+            if (x < lineXRight + this.lineRadius && x > lineXLeft - this.lineRadius)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsOnVerticalLine(int x, int y, int lineX, int lineYHigh, int lineYLow)
+    {
+        if (x < lineX + this.lineRadius && x > lineX - this.lineRadius)
+        {
+            if (y < lineYHigh + this.lineRadius && y > lineYLow - this.lineRadius)
+                return true;
+        }
+
+        return false;
+    }
+
+    public void UpdateCombustionChamber(double density)
+    {
+        int minX = this.x + this.lineRadius;
+        int maxX = this.x + this.combustionChamberLength - this.lineRadius;
+        int minY = this.y - this.combustionChamberRadius + this.lineRadius;
+        int maxY = this.y + this.combustionChamberRadius - this.lineRadius;
+
+        for(int x = minX; x < maxX; x++)
+        {
+            for(int y = minY; y < maxY; y++)
+            {
+                int index = x + y * this.grid.gridWidth;
+                //this.grid.latticeGrid[index].SetDensity(density);
+                this.grid.latticeGrid[index].AddDensityInDirection(density, 1);
+                //this.grid.latticeGrid[index].AddDensity(density);
+            }
+        }
+    }
+
+    
 }
