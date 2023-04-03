@@ -21,15 +21,14 @@ using UnityEngine;
 
 // Todo:
 // 1. Variabele zoals de afstand tussen cells in (dx), de velocity tussen 2 cells in (c), en viscosity toevoegen
-// 3. Nozzle generator toevoegen
 // 4. Thrust meter toevoegen
 // 5. Array 2d maken (huidige implementatie is veelste traag)
 
 
 public class LBM : MonoBehaviour
 {
-    public const int WIDTH = 512;//256;
-    public const int HEIGHT = 512; //256;
+    public const int WIDTH = 256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
+    public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
     //public const double viscosity = 0.000017; // Lucht op 20km hoogte
     public const double RELAXATION_TIME = 8.0; //1.0 // Min: 0.53 Max: geen? //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
@@ -41,17 +40,20 @@ public class LBM : MonoBehaviour
     public Nozzle nozzle;
     public double nozzleDensity = 1.0;
 
-    public int NozzleX = 20;
+    public int NozzleX = 10;
     public int NozzleY = 180;
     public int NozzleLineRadius = 3;
     public int CombChamRadius = 20;
     public int CombChamLength = 70;
+    public int ThroatRadius = 5;
+    public int ConvergeLength = 30;
+    public int DivergeLength = 40;
 
     public Material outputMaterial;
 
     void Start()
     {
-        this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, 0, 0, 0);
+        this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, ThroatRadius, ConvergeLength, DivergeLength);
         this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity, nozzle);
         this.nozzle.grid = this.Grid;
         //this.Grid.AddCylinder(40, 40, 30, 1.0);
@@ -195,9 +197,8 @@ public class LatticeGrid
 
     public bool IsPartOfNozzle(int x, int y)
     {
-        //return IsOnNozzleShape(50.0, 100.0, 20.0, x, y);
         return this.nozzle.IsOnNozzle(x, y);
-        //return IsInCylinder(x, y, 200, 80, 20);
+        //return false;
     }
 
     public static bool IsOnNozzleShape(double throatRadius, double exitRadius, double expansionRatio, double x, double y)
@@ -590,49 +591,79 @@ public class Nozzle
     private int combustionChamberRadius;
     private int combustionChamberLength;
     private int throatRadius;
-    private int curve;
-    private int exitRadius;
+    private int convergeLength;
+    //private Func<int, int> curve = x => 1;
+    private Func<int, int> convergeFunction = x => -(x/3);
+    private int divergeLength;
+    private Func<int, int> divergeFunction = x => (int)Math.Sqrt(x);
+    //private int exitRadius;
 
-    public Nozzle(int x, int y, int lineRadius, int combustChamberRadius, int combustChamberLength, int throatRadius, int curve, int exitRadius)
+    public Nozzle(int x, int y, int lineRadius, int combustChamberRadius, int combustChamberLength, int throatRadius, int convergeLength, int divergeLength)
     {
         this.x = x;
         this.y = y;
         this.lineRadius = lineRadius;
         this.combustionChamberRadius = combustChamberRadius;
         this.combustionChamberLength = combustChamberLength;
+        this.convergeLength = convergeLength;
+        this.divergeLength = divergeLength;
         this.throatRadius = throatRadius;
-        this.curve = curve;
-        this.exitRadius = exitRadius;
+        //this.exitRadius = exitRadius;
     }
 
     public bool IsOnNozzle(int x, int y)
     {
         int minX = this.x;
         int maxCombChamX = this.x + this.combustionChamberLength;
-        int minY = this.y - this.combustionChamberRadius;
-        int maxY = this.y + this.combustionChamberRadius;
+        int minCombChamY = this.y - this.combustionChamberRadius;
+        int maxCombChamY = this.y + this.combustionChamberRadius;
+        int maxConvX = maxCombChamX + this.convergeLength;
+        int maxConvY = maxCombChamY + this.convergeFunction(this.convergeLength);
+        int minConvY = minCombChamY - this.convergeFunction(this.convergeLength);
+        int maxDivX = maxConvX + this.divergeLength;
 
         // Combustion chamber
         if (x < (minX - this.lineRadius))
             return false; // Point is behind nozzle and chamber
 
         // Check 2 horizontal lines
-        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, minY))
+        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, minCombChamY))
             return true;
 
-        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, maxY))
+        if (IsOnHorizontalLine(x, y, minX, maxCombChamX, maxCombChamY))
             return true;
 
         // Check if on the back of the combustion chamber
-        if (IsOnVerticalLine(x, y, minX, maxY, minY))
+        if (IsOnVerticalLine(x, y, minX, maxCombChamY, minCombChamY))
             return true;
 
-        //if (IsOnVerticalLine(x, y, maxCombChamX, maxY, minY))
-        //    return true;
-
         // Converging
+        if(x <= maxConvX && x > maxCombChamX)
+        {
+            int y_ = this.convergeFunction(x - maxCombChamX) ;
+            if (Math.Abs(y - (y_ + maxCombChamY)) < this.lineRadius)
+                return true;
+
+            if (Math.Abs(y - (-y_ + minCombChamY)) < this.lineRadius)
+                return true;
+        }
 
         // Diverging
+        if(x <= maxDivX && x > maxConvX)
+        {
+            int y_ = this.divergeFunction(x - maxConvX);
+            if (Math.Abs(y - (y_ + maxConvY)) < this.lineRadius)
+                return true;
+
+            if (Math.Abs(y - (-y_ + minConvY)) < this.lineRadius)
+                return true;
+
+            //int diff = maxConvX - minConvY;
+
+            //if (Math.Abs(y - (-y_ - 2 * diff)) < this.lineRadius)
+            //    return true;
+        }
+
         return false;
     }
 
