@@ -27,7 +27,7 @@ using UnityEngine;
 
 public class LBM : MonoBehaviour
 {
-    public const int WIDTH = 256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
+    public const int WIDTH = 512; //256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
     public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
     //public const double viscosity = 0.000017; // Lucht op 20km hoogte
@@ -169,7 +169,7 @@ public class LatticeGrid
     public readonly double relaxationTime;
     public readonly double relaxationFactor;
     public readonly double c2;
-    public LatticeGridNode[] latticeGrid { get; private set; }
+    public LatticeGridNode[,] latticeGrid { get; private set; }
 
     // Lattice constants
     public static readonly double[] eX = { 0, 1, 0, -1, 0, 1, -1, -1, 1 }; // x direction of distribution at index
@@ -233,24 +233,23 @@ public class LatticeGrid
 
     public bool IsSolid(int x, int y)
     {
-        return (latticeGrid[x + y * gridHeight] is SolidLatticeNode);
+        return (latticeGrid[x, y] is SolidLatticeNode);
     }
 
     public void Initialize(double density)
     {
-        latticeGrid = new LatticeGridNode[gridWidth * gridHeight];
+        latticeGrid = new LatticeGridNode[gridWidth, gridHeight];
         for(int x = 0; x < gridWidth; x++)
         {
             for(int y = 0; y < gridHeight; y++)
             {
-                int index = x + y * gridHeight;
                 if(IsPartOfNozzle(x, y))
                 {
-                    latticeGrid[index] = new SolidLatticeNode();
+                    latticeGrid[x, y] = new SolidLatticeNode();
                 }
                 else
                 {
-                    latticeGrid[index] = new FluidLatticeNode(density);
+                    latticeGrid[x, y] = new FluidLatticeNode(density);
                 }
             }
         }
@@ -275,20 +274,19 @@ public class LatticeGrid
 
     private void InitializeRandom()
     {
-        latticeGrid = new LatticeGridNode[gridWidth * gridHeight];
+        latticeGrid = new LatticeGridNode[gridWidth, gridHeight];
         for (int x = 0; x < gridWidth; x++)
         {
             for (int y = 0; y < gridHeight; y++)
             {
-                int index = x + y * gridHeight;
                 if(IsPartOfNozzle(x, y))
                 {
-                    latticeGrid[index] = new SolidLatticeNode();
+                    latticeGrid[x, y] = new SolidLatticeNode();
                 }
                 else
                 {
                     double r = (double)UnityEngine.Random.Range(0.5f, 1.0f);
-                    latticeGrid[index] = new FluidLatticeNode(r);
+                    latticeGrid[x, y] = new FluidLatticeNode(r);
                 }
             }
         }
@@ -304,8 +302,7 @@ public class LatticeGrid
 
                 if (inCylinder)
                 {
-                    int index = x + y * gridHeight;
-                    latticeGrid[index].AddDensity(density);
+                    latticeGrid[x, y].AddDensity(density);
                 }
             }
         }
@@ -321,8 +318,7 @@ public class LatticeGrid
 
                 if (inCylinder)
                 {
-                    int index = x + y * gridHeight;
-                    latticeGrid[index].SetDensity(density);
+                    latticeGrid[x, y].SetDensity(density);
                 }
             }
         }
@@ -345,9 +341,9 @@ public class LatticeGrid
     {
         sumDensity = 0.0; // Debug value
 
-        for (int x = 0; x < gridHeight; x++)
+        for (int x = 0; x < gridWidth; x++)
         {
-            for (int y = 0; y < gridWidth; y++)
+            for (int y = 0; y < gridHeight; y++)
             {
                 // Dont compute anything for solid nodes
                 if (IsSolid(x, y))
@@ -358,8 +354,7 @@ public class LatticeGrid
                 double velocityX = 0.0; // General velocity of the gas (X)
                 double velocityY = 0.0; // General velocity of the gas (Y)
 
-                int index = x + y * gridHeight;
-                FluidLatticeNode node = (FluidLatticeNode)latticeGrid[index];
+                FluidLatticeNode node = (FluidLatticeNode)latticeGrid[x, y];
 
                 for (int k = 0; k < 9; k++)
                 {
@@ -392,7 +387,7 @@ public class LatticeGrid
                     // Compute shader (1 of 3)
                     //node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];  
                     // Python
-                    node.distribution[k] = node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]);
+                    node.distribution[k] = Math.Max(0, node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]));
                 }
             }
         }
@@ -426,35 +421,31 @@ public class LatticeGrid
     public void StreamingStep()
     {
         // Create a temporary distribution grid to perform streaming
-        LatticeGridNode[] tempGrid = new LatticeGridNode[gridWidth * gridHeight];
+        LatticeGridNode[,] tempGrid = new LatticeGridNode[gridWidth, gridHeight];
 
         for (int x = 0; x < gridWidth; x++)
         {
             for (int y = 0; y < gridHeight; y++)
             {
-                int index = x + y * gridHeight;
                 if(IsSolid(x, y))
                 {
-                    tempGrid[index] = latticeGrid[index]; // No need to create a new object, since a solid object does nothing anyway
+                    tempGrid[x, y] = latticeGrid[x, y]; // No need to create a new object, since a solid object does nothing anyway
                 }
                 else
                 {
-                    tempGrid[index] = new FluidLatticeNode();
+                    tempGrid[x, y] = new FluidLatticeNode();
                 }
             }
         }
 
         // Perform streaming on all nodes
-        for (int x = 0; x < gridHeight; x++)
+        for (int x = 0; x < gridWidth; x++)
         {
-            for (int y = 0; y < gridWidth; y++)
+            for (int y = 0; y < gridHeight; y++)
             {
                 // Dont stream solid cells
                 if (IsSolid(x, y))
                     continue;
-
-                // Calculate the index of the current node in the 1D grid
-                int currentIndex = x + y * gridHeight;
 
                 // Stream the distributions to their new locations
                 for (int i = 0; i < 9; i++)
@@ -481,9 +472,6 @@ public class LatticeGrid
                     {
                         newY -= gridHeight;
                     }
-
-                    // Calculate the index of the new node in the 1D grid
-                    int newIndex = newX + newY * gridHeight;
                     
                     // !!!!!!!!!!!!!!!!!!!!!!!!!!!
                     // BOUNCE-BACK WAARSCHIJNLIJK NIET GOED GEDAAN
@@ -491,7 +479,7 @@ public class LatticeGrid
                     {
                         // Solid boundary bounce-back
                         int oppositeIndex = bounceBack[i];
-                        (tempGrid[currentIndex] as FluidLatticeNode).distribution[oppositeIndex] = (latticeGrid[currentIndex] as FluidLatticeNode).distribution[i];
+                        (tempGrid[x, y] as FluidLatticeNode).distribution[oppositeIndex] = (latticeGrid[x, y] as FluidLatticeNode).distribution[i];
                         //newX = (newX + (int)eX[oppositeIndex] * 2) % gridWidth;
                         //newY = (newY + (int)eY[oppositeIndex] * 2) % gridHeight;
 
@@ -501,33 +489,32 @@ public class LatticeGrid
                     else // WAARSCHIJNLIJK NIET GOED!!!!!
                     {
                         // Stream the distribution to the new location
-                        (tempGrid[newIndex] as FluidLatticeNode).distribution[i] = (latticeGrid[currentIndex] as FluidLatticeNode).distribution[i];
+                        (tempGrid[newX, newY] as FluidLatticeNode).distribution[i] = (latticeGrid[x, y] as FluidLatticeNode).distribution[i];
                     }
                     // !!!!!!!!!!!!!!!!
                     
                 }
 
                 // Copy the macroscopic variables to the new node
-                (tempGrid[currentIndex] as FluidLatticeNode).density = (latticeGrid[currentIndex] as FluidLatticeNode).density;
-                (tempGrid[currentIndex] as FluidLatticeNode).velocityX = (latticeGrid[currentIndex] as FluidLatticeNode).velocityX;
-                (tempGrid[currentIndex] as FluidLatticeNode).velocityY = (latticeGrid[currentIndex] as FluidLatticeNode).velocityY;
+                (tempGrid[x, y] as FluidLatticeNode).density = (latticeGrid[x, y] as FluidLatticeNode).density;
+                (tempGrid[x, y] as FluidLatticeNode).velocityX = (latticeGrid[x, y] as FluidLatticeNode).velocityX;
+                (tempGrid[x, y] as FluidLatticeNode).velocityY = (latticeGrid[x, y] as FluidLatticeNode).velocityY;
             }
         }
 
         // Update the lattice grid with the streamed values
-        for (int x = 0; x < gridHeight; x++)
+        for (int x = 0; x < gridWidth; x++)
         {
-            for (int y = 0; y < gridWidth; y++)
+            for (int y = 0; y < gridHeight; y++)
             {
                 // Dont stream solid cells
                 if (IsSolid(x, y))
                     continue;
-                int index = x + y * gridHeight;
 
-                (latticeGrid[index] as FluidLatticeNode).distribution = (tempGrid[index] as FluidLatticeNode).distribution;
-                (latticeGrid[index] as FluidLatticeNode).density = (tempGrid[index] as FluidLatticeNode).density;
-                (latticeGrid[index] as FluidLatticeNode).velocityX = (tempGrid[index] as FluidLatticeNode).velocityX;
-                (latticeGrid[index] as FluidLatticeNode).velocityY = (tempGrid[index] as FluidLatticeNode).velocityY;
+                (latticeGrid[x, y] as FluidLatticeNode).distribution = (tempGrid[x, y] as FluidLatticeNode).distribution;
+                (latticeGrid[x, y] as FluidLatticeNode).density = (tempGrid[x, y] as FluidLatticeNode).density;
+                (latticeGrid[x, y] as FluidLatticeNode).velocityX = (tempGrid[x, y] as FluidLatticeNode).velocityX;
+                (latticeGrid[x, y] as FluidLatticeNode).velocityY = (tempGrid[x, y] as FluidLatticeNode).velocityY;
             }
         }
     }
@@ -547,9 +534,7 @@ public class LatticeGrid
                 }
                 else
                 {
-                    int index = x + y * gridHeight;
-
-                    double r = (latticeGrid[index] as FluidLatticeNode).density;
+                    double r = (latticeGrid[x, y] as FluidLatticeNode).density;
                     //double g = latticeGrid[index].velocityX;
                     //double b = latticeGrid[index].velocityY;
 
@@ -700,9 +685,8 @@ public class Nozzle
         {
             for(int y = minY; y < maxY; y++)
             {
-                int index = x + y * this.grid.gridWidth;
                 //this.grid.latticeGrid[index].SetDensity(density);
-                this.grid.latticeGrid[index].AddDensityInDirection(density, 1);
+                this.grid.latticeGrid[x, y].AddDensityInDirection(density, 1);
                 //this.grid.latticeGrid[index].AddDensity(density);
             }
         }
