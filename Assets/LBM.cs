@@ -26,11 +26,13 @@ using UnityEngine;
 
 public class LBM : MonoBehaviour
 {
+    public bool maximizeDistribution = true;
+
     public const int WIDTH = 512; //256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
     public const int HEIGHT = 256;
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
     //public const double viscosity = 0.000017; // Lucht op 20km hoogte
-    public const double RELAXATION_TIME = 0.53; //1.0 // Min: 0.53 Max: geen? //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
+    public double RELAXATION_TIME = 8.0; //1.0 // Min: 0.53 Max: geen? //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
 
     public const double baseDensity = 1.0;
 
@@ -54,6 +56,7 @@ public class LBM : MonoBehaviour
     {
         this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, ThroatRadius, ConvergeLength, DivergeLength);
         this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity, nozzle);
+        this.Grid.maximizeDistribution = this.maximizeDistribution;
         this.nozzle.grid = this.Grid;
         //this.Grid.AddCylinder(40, 40, 30, 1.0);
     }
@@ -63,16 +66,16 @@ public class LBM : MonoBehaviour
         //this.Grid.AddCylinder(80, 80, 30, 0.5);
         //this.Grid.AddCylinder(40, 40, 30, .01);
         //this.Grid.MaintainCylinder(40, 40, 30, 1.0);
+
+        // Calculations
+        this.Grid.maximizeDistribution = this.maximizeDistribution;
+        this.Grid.relaxationFactor = 1.0 / this.RELAXATION_TIME;
         this.nozzle.UpdateCombustionChamber(nozzleDensity);
         this.Grid.Step();
 
+        // Display
+        double thrust = this.Grid.CalculateThrust();
+        Debug.Log("Thrust: " + thrust);
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
     }
 }
-
-// `rho` is de "macroscopic density" van de vloeistof op elke cell
-// `tau` is de "kinematic viscosity / timescale / relaxation time" van de vloeistof in het algemeen.
-
-
-
-

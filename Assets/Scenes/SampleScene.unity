@@ -297,7 +297,7 @@ Transform:
   m_GameObject: {fileID: 649803128}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -2.1137466}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 1
@@ -314,5 +314,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e43e16483315bd4887e299ab9f4a439, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  nozzleDensity: 0.001
+  maximizeDistribution: 1
+  RELAXATION_TIME: 8
+  nozzleDensity: 0.58
+  NozzleX: 20
+  NozzleY: 128
+  NozzleLineRadius: 3
+  CombChamRadius: 20
+  CombChamLength: 80
+  ThroatRadius: 5
+  ConvergeLength: 30
+  DivergeLength: 40
   outputMaterial: {fileID: 2100000, guid: 501fc766c7167d34a830cf4a6e30853e, type: 2}

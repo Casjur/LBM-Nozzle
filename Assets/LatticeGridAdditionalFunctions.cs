@@ -5,6 +5,39 @@ using UnityEngine;
 
 public partial class LatticeGrid
 {
+    public double CalculateThrust()
+    {
+        double thrust = 0.0;
+
+        int xRadius = 3;
+        
+        int outX = this.nozzle.outletX;
+        int outYHigh = this.nozzle.outletYHigh;
+        int outYLow = this.nozzle.outletYLow;
+
+        for(int x = outX - xRadius; x < outX + xRadius; x++)
+        {
+            for(int y = outYLow; y < outYHigh; y++)
+            {
+                if(!IsSolid(x,y))
+                {
+                    FluidLatticeNode node = (FluidLatticeNode)this.latticeGrid[x, y];
+                    //double vn = ((node.velocityX / node.density) * eX[1]) + ((node.velocityY / node.density) * eY[1]);
+
+                    //double momentumFlux = node.density * vn;
+
+                    //thrust += momentumFlux;
+
+                    thrust += node.velocityX;
+                }
+            }
+        }
+
+        int outletArea = (xRadius * 2) * Math.Abs(outYHigh - outYLow);
+
+        return thrust * (double)outletArea;
+    }
+
     public void AddCylinder(int xPosition, int yPosition, int r, double density)
     {
         for (int x = 0; x < gridWidth; x++)
@@ -69,6 +102,13 @@ public partial class LatticeGrid
                     //Color color = new Color(1.0f / (float)r, 0, 0);
                     color = GenerateDensityColor(d);
                     //color = GenerateVelocityColor(vx, vy);
+
+                    // Thrust measuring boundary
+                    if (x > this.nozzle.outletX - 3 && x < this.nozzle.outletX + 3 && y > this.nozzle.outletYLow && y < this.nozzle.outletYHigh)
+                    {
+                        color += Color.green;
+                    }
+                    
                 }
 
                 outputTexture.SetPixel(x, y, color);

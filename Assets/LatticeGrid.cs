@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 
@@ -8,6 +9,8 @@ using UnityEngine;
 // `tau` is de "kinematic viscosity / timescale / relaxation time" van de vloeistof in het algemeen.
 public partial class LatticeGrid
 {
+    public bool maximizeDistribution;
+
     public Nozzle nozzle;
 
     // Test variables
@@ -17,7 +20,7 @@ public partial class LatticeGrid
     public readonly int gridWidth;
     public readonly int gridHeight;
     public readonly double relaxationTime;
-    public readonly double relaxationFactor;
+    public double relaxationFactor;
     public readonly double c2;
     public LatticeGridNode[,] latticeGrid { get; private set; }
 
@@ -41,8 +44,8 @@ public partial class LatticeGrid
 
         this.nozzle = nozzle;
 
-        //Initialize(baseDensity);
-        InitializeRandom();
+        Initialize(0.01);
+        //InitializeRandom();
     }
 
     public bool IsPartOfNozzle(int x, int y)
@@ -104,6 +107,8 @@ public partial class LatticeGrid
     {
         sumDensity = 0.0; // Debug value
 
+        //Parallel.For()
+
         for (int x = 0; x < gridWidth; x++)
         {
             for (int y = 0; y < gridHeight; y++)
@@ -150,7 +155,10 @@ public partial class LatticeGrid
                     // Compute shader (1 of 3)
                     //node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];  
                     // Python
-                    node.distribution[k] = Math.Max(0, node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]));
+                    if(this.maximizeDistribution)
+                        node.distribution[k] = Math.Max(0, node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]));
+                    else
+                        node.distribution[k] = node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]);
                 }
             }
         }
@@ -218,23 +226,29 @@ public partial class LatticeGrid
                     int newY = y + (int)eY[i];
 
                     // Periodic boundary conditions (if something leaves on the left, it returns on the right)
-                    if (newX < 0)
+
+                    if (newX < 0 || newX >= gridWidth || newY < 0 || newY >= gridHeight)
                     {
-                        newX += gridWidth;
-                    }
-                    else if (newX >= gridWidth)
-                    {
-                        newX -= gridWidth;
+                        continue;
                     }
 
-                    if (newY < 0)
-                    {
-                        newY += gridHeight;
-                    }
-                    else if (newY >= gridHeight)
-                    {
-                        newY -= gridHeight;
-                    }
+                    //if (newX < 0)
+                    //{
+                    //    newX += gridWidth;
+                    //}
+                    //else if (newX >= gridWidth)
+                    //{
+                    //    newX -= gridWidth;
+                    //}
+
+                    //if (newY < 0)
+                    //{
+                    //    newY += gridHeight;
+                    //}
+                    //else if (newY >= gridHeight)
+                    //{
+                    //    newY -= gridHeight;
+                    //}
 
                     // !!!!!!!!!!!!!!!!!!!!!!!!!!!
                     // BOUNCE-BACK WAARSCHIJNLIJK NIET GOED GEDAAN
@@ -247,8 +261,10 @@ public partial class LatticeGrid
                     // !!!!!!!!!!!!!!!!!
                     else // WAARSCHIJNLIJK NIET GOED!!!!!
                     {
+                        
                         // Stream the distribution to the new location
                         (tempGrid[newX, newY] as FluidLatticeNode).distribution[i] = (latticeGrid[x, y] as FluidLatticeNode).distribution[i];
+                        
                     }
                     // !!!!!!!!!!!!!!!!
 
