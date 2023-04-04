@@ -44,7 +44,7 @@ public partial class LatticeGrid
 
         this.nozzle = nozzle;
 
-        Initialize(0.01);
+        Initialize(0.1);
         //InitializeRandom();
     }
 

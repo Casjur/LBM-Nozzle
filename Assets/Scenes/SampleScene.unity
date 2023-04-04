@@ -315,14 +315,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maximizeDistribution: 1
-  RELAXATION_TIME: 8
-  nozzleDensity: 0.58
+  RELAXATION_TIME: 800
+  nozzleDensity: 10
   NozzleX: 20
   NozzleY: 128
   NozzleLineRadius: 3
   CombChamRadius: 20
-  CombChamLength: 80
+  CombChamLength: 10
   ThroatRadius: 5
-  ConvergeLength: 30
-  DivergeLength: 40
+  ConvergeLength: 10
+  DivergeLength: 95
   outputMaterial: {fileID: 2100000, guid: 501fc766c7167d34a830cf4a6e30853e, type: 2}

@@ -4,10 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Problemen:
-// 1?. Kleuren zijn verticale strepen, als je in zoomt. Mogelijk gwn bug in Unity
-//      * Groen = verticale strepen
-//      * Blauw = horizontaal
-// 2. Extreem instabiel voor sommige densities. Debug log parameters, wanneer extreme waardes / verschil in waardes gemaakt worden
+// 1. Extreem instabiel voor sommige densities. Debug log parameters, wanneer extreme waardes / verschil in waardes gemaakt worden
 //      * Dit kan gebeuren wanneer verschil tussen x en y snelheid 0.8165 is. HOUD 0.73 AAN IPV 0.8165!!!
 //      * Zolang de velocity in zowel de x als y richting niet groter is dan 0.407 zou de simulatie moeten blijven werken (4.226 zou misschien ook kunnen werken)
 //      * 0 < vel.x < 0.73 && vel.y = 0.73 - vel.x        werkt
@@ -18,6 +15,7 @@ using UnityEngine;
 //          - Ma > sqrt(3) − 1 ~= 0.73        (hoort een streepje boven Ma)
 //          - Gemiddeld Mach getal
 //      * https://www.reddit.com/r/CFD/comments/128x7uq/latticeboltzmann_unstable/?utm_source=share&utm_medium=web2x&context=3 
+// 2. Thrust waardes lijken precies verkeerd om (wanneer er een rechte straal uit de nozzle schiet is de thrust lager, dan bij een uitgespreide straal)
 
 // Todo:
 // 1. Variabele zoals de afstand tussen cells in (dx), de velocity tussen 2 cells in (c), en viscosity toevoegen

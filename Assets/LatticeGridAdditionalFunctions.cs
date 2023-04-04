@@ -28,7 +28,7 @@ public partial class LatticeGrid
 
                     //thrust += momentumFlux;
 
-                    thrust += node.velocityX;
+                    thrust += node.velocityX * node.density;
                 }
             }
         }
@@ -88,7 +88,7 @@ public partial class LatticeGrid
                 Color color;
                 if (IsSolid(x, y))
                 {
-                    color = Color.black;
+                    color = Color.gray;
                 }
                 else
                 {
