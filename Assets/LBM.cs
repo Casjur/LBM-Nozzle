@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 // Problemen:
@@ -24,27 +25,36 @@ using UnityEngine;
 
 public class LBM : MonoBehaviour
 {
+    public static StreamWriter DataOuput;
+    public static int EveryIterations = 50;
+    public static int Iteration;
+
+
+    // Grid / Simulation
     public bool maximizeDistribution = true;
 
-    public const int WIDTH = 512; //256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
-    public const int HEIGHT = 256;
+    public static int WIDTH = 300; //256; // Moeten hetzelfde zijn (index wordt verkeerd berekend)
+    public static int HEIGHT = 150;
+    
     //public const float VISCOSITY = 1.0f; // !!! Wordt nergens gebruikt !!!
     //public const double viscosity = 0.000017; // Lucht op 20km hoogte
     public double RELAXATION_TIME = 8.0; //1.0 // Min: 0.53 Max: geen? //(2 * viscosity + 1 / 2) / (Math.Pow(c2, 2));
+    public double SOUND_SPEED = 1.0 / 3.0;
 
-    public const double baseDensity = 1.0;
+    public double baseDensity = 0.1;
 
     public LatticeGrid Grid;
 
+    // Nozzle
     public Nozzle nozzle;
     public double nozzleDensity = 0.2;
 
-    public int NozzleX = 10;
-    public int NozzleY = 180;
-    public int NozzleLineRadius = 3;
+    public int NozzleX = 1;
+    private int NozzleY = (int)(HEIGHT / 2);
+    public int NozzleLineRadius = 1;
     public int CombChamRadius = 20;
     public int CombChamLength = 70;
-    public int ThroatRadius = 5;
+    private int ThroatRadius = 5;
     public int ConvergeLength = 30;
     public int DivergeLength = 40;
 
@@ -52,28 +62,49 @@ public class LBM : MonoBehaviour
 
     void Start()
     {
+        DataOuput = new StreamWriter("C:/Users/Casper/Documents/Gametechnologie/OnderzoeksMethoden/LBM-Nozzle/Assets/GeneratedData/NozzleData.txt");
+        Iteration = 0;
+
         this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, ThroatRadius, ConvergeLength, DivergeLength);
-        this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, baseDensity, nozzle);
+        this.Grid = new LatticeGrid(WIDTH, HEIGHT, RELAXATION_TIME, SOUND_SPEED, baseDensity, nozzle);
+
         this.Grid.maximizeDistribution = this.maximizeDistribution;
         this.nozzle.grid = this.Grid;
-        //this.Grid.AddCylinder(40, 40, 30, 1.0);
     }
 
     void Update()
     {
-        //this.Grid.AddCylinder(80, 80, 30, 0.5);
-        //this.Grid.AddCylinder(40, 40, 30, .01);
-        //this.Grid.MaintainCylinder(40, 40, 30, 1.0);
-
-        // Calculations
+        // Update variables
         this.Grid.maximizeDistribution = this.maximizeDistribution;
         this.Grid.relaxationFactor = 1.0 / this.RELAXATION_TIME;
+        this.Grid.c2 = this.SOUND_SPEED * this.SOUND_SPEED;
+
+        //this.Grid.MaintainAirflow(1.0, 1);
+
+        // Calculations
         this.nozzle.UpdateCombustionChamber(nozzleDensity);
         this.Grid.Step();
 
+        // Thrust
+        //Debug.Log("Thrust: " + thrust);
+        if (Iteration % EveryIterations == 0)
+        {
+            double thrust = this.Grid.CalculateThrust();
+            DataOuput.WriteLine(" " + thrust.ToString());
+            Debug.Log(Iteration);
+            if (Iteration >= 2000)
+                Application.Quit();
+        }
+
         // Display
-        double thrust = this.Grid.CalculateThrust();
-        Debug.Log("Thrust: " + thrust);
         this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
+
+        // Increment iterations
+        Iteration++;
+    }
+
+    public void OnApplicationQuit()
+    {
+        DataOuput.Close();
     }
 }

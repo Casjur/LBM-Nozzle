@@ -21,7 +21,7 @@ public partial class LatticeGrid
     public readonly int gridHeight;
     public readonly double relaxationTime;
     public double relaxationFactor;
-    public readonly double c2;
+    public double c2;
     public LatticeGridNode[,] latticeGrid { get; private set; }
 
     // Lattice constants
@@ -34,17 +34,17 @@ public partial class LatticeGrid
     };
     public static readonly int[] bounceBack = { 0, 3, 4, 1, 2, 7, 8, 5, 6 }; // index of the opposite direction for each direction
 
-    public LatticeGrid(int width, int height, double tau, double baseDensity, Nozzle nozzle)
+    public LatticeGrid(int width, int height, double tau, double c, double baseDensity, Nozzle nozzle)
     {
         gridWidth = width;
         gridHeight = height;
         relaxationTime = tau;
         relaxationFactor = 1.0 / tau;
-        c2 = 1.0 / 3.0;
+        c2 = c * c; //0.000833333333333; //1.0 / 3.0;
 
         this.nozzle = nozzle;
 
-        Initialize(0.1);
+        Initialize(baseDensity);
         //InitializeRandom();
     }
 
@@ -109,7 +109,9 @@ public partial class LatticeGrid
 
         //Parallel.For()
 
-        for (int x = 0; x < gridWidth; x++)
+        //for (int x = 0; x < gridWidth; x++)
+        //{
+        Parallel.For(0, gridWidth, x =>
         {
             for (int y = 0; y < gridHeight; y++)
             {
@@ -155,15 +157,19 @@ public partial class LatticeGrid
                     // Compute shader (1 of 3)
                     //node.distribution[k] = relaxationFactor * feq[k] + (1 - relaxationFactor) * node.distribution[k];  
                     // Python
-                    if(this.maximizeDistribution)
+                    if (this.maximizeDistribution)
                         node.distribution[k] = Math.Max(0, node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]));
                     else
                         node.distribution[k] = node.distribution[k] - relaxationFactor * (node.distribution[k] - feq[k]);
                 }
             }
-        }
+        });
 
-        Debug.Log("Collision Density: " + sumDensity);
+        if(LBM.Iteration % LBM.EveryIterations == 0)
+        {
+            LBM.DataOuput.Write(sumDensity);
+        }
+        //Debug.Log("Collision Density: " + sumDensity);
     }
 
     double EquilibriumFunction(double rho, double ux, double uy, int i)
@@ -210,7 +216,9 @@ public partial class LatticeGrid
         }
 
         // Perform streaming on all nodes
-        for (int x = 0; x < gridWidth; x++)
+        //for (int x = 0; x < gridWidth; x++)
+        //{
+        Parallel.For(0, gridWidth, x =>
         {
             for (int y = 0; y < gridHeight; y++)
             {
@@ -261,10 +269,10 @@ public partial class LatticeGrid
                     // !!!!!!!!!!!!!!!!!
                     else // WAARSCHIJNLIJK NIET GOED!!!!!
                     {
-                        
+
                         // Stream the distribution to the new location
                         (tempGrid[newX, newY] as FluidLatticeNode).distribution[i] = (latticeGrid[x, y] as FluidLatticeNode).distribution[i];
-                        
+
                     }
                     // !!!!!!!!!!!!!!!!
 
@@ -275,7 +283,7 @@ public partial class LatticeGrid
                 (tempGrid[x, y] as FluidLatticeNode).velocityX = (latticeGrid[x, y] as FluidLatticeNode).velocityX;
                 (tempGrid[x, y] as FluidLatticeNode).velocityY = (latticeGrid[x, y] as FluidLatticeNode).velocityY;
             }
-        }
+        });
 
         // Update the lattice grid with the streamed values
         for (int x = 0; x < gridWidth; x++)

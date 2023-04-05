@@ -314,15 +314,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e43e16483315bd4887e299ab9f4a439, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maximizeDistribution: 1
-  RELAXATION_TIME: 800
-  nozzleDensity: 10
-  NozzleX: 20
-  NozzleY: 128
+  maximizeDistribution: 0
+  RELAXATION_TIME: 8
+  SOUND_SPEED: 0.577
+  baseDensity: 0.1
+  nozzleDensity: 1.22
+  NozzleX: 1
   NozzleLineRadius: 3
   CombChamRadius: 20
   CombChamLength: 10
-  ThroatRadius: 5
-  ConvergeLength: 10
-  DivergeLength: 95
+  ConvergeLength: 30
+  DivergeLength: 80
   outputMaterial: {fileID: 2100000, guid: 501fc766c7167d34a830cf4a6e30853e, type: 2}

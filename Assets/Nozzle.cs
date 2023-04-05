@@ -24,7 +24,7 @@ public class Nozzle
     //private Func<int, int> curve = x => 1;
     private readonly Func<int, int> convergeFunction = x => -(x / 3);
     private readonly int divergeLength;
-    private readonly Func<int, int> divergeFunction = x => (int)Math.Sqrt(x);
+    private readonly Func<int, int> divergeFunction = x => (int)Math.Sqrt(x); //x; //
     //private int exitRadius;
 
     private int minX;
@@ -61,17 +61,10 @@ public class Nozzle
         this.outletX = x + combustChamberLength + convergeLength + divergeLength;
         this.outletYHigh = divergeFunction(divergeLength) + maxConvY;
         this.outletYLow = -divergeFunction(divergeLength) + minConvY;
-
-        
     }
 
     public bool IsOnNozzle(int x, int y)
-    {
-        //int minX = this.x;
-        //int maxCombChamX = this.x + this.combustionChamberLength;
-        //int minCombChamY = this.y - this.combustionChamberRadius;
-        //int maxCombChamY = this.y + this.combustionChamberRadius;
-        
+    {  
         // Combustion chamber
         if (x < (minX - this.lineRadius))
             return false; // Point is behind nozzle and chamber
@@ -87,8 +80,6 @@ public class Nozzle
         if (IsOnVerticalLine(x, y, minX, maxCombChamY, minCombChamY))
             return true;
 
-        //int maxConvX = maxCombChamX + this.convergeLength;
-
         // Converging
         if (x <= maxConvX && x > maxCombChamX)
         {
@@ -99,10 +90,6 @@ public class Nozzle
             if (Math.Abs(y - (-y_ + minCombChamY)) < this.lineRadius)
                 return true;
         }
-
-        //int maxConvY = maxCombChamY + this.convergeFunction(this.convergeLength);
-        //int minConvY = minCombChamY - this.convergeFunction(this.convergeLength);
-        //int maxDivX = maxConvX + this.divergeLength;
 
         // Diverging
         if (x <= maxDivX && x > maxConvX)
@@ -151,10 +138,10 @@ public class Nozzle
 
         for (int x = minX; x < maxX; x++)
         {
-            for (int y = minY; y < maxY; y++)
+            for (int y = minY; y <= maxY; y++)
             {
-                this.grid.latticeGrid[x, y].SetDensity(density);
-                //this.grid.latticeGrid[x, y].AddDensityInDirection(density, 1);
+                //this.grid.latticeGrid[x, y].SetDensity(density);
+                this.grid.latticeGrid[x, y].AddDensityInDirection(density, 1);
                 //this.grid.latticeGrid[x, y].AddDensity(density);
             }
         }
