@@ -62,7 +62,7 @@ public class LBM : MonoBehaviour
 
     void Start()
     {
-        DataOuput = new StreamWriter("C:/Users/Casper/Documents/Gametechnologie/OnderzoeksMethoden/LBM-Nozzle/Assets/GeneratedData/NozzleData.txt");
+        DataOuput = new StreamWriter("C:/Users/Casper/Documents/GitHub/LBM-Nozzle/Assets/GeneratedData/NozzleData.txt");
         Iteration = 0;
 
         this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, ThroatRadius, ConvergeLength, DivergeLength);
@@ -92,8 +92,8 @@ public class LBM : MonoBehaviour
             double thrust = this.Grid.CalculateThrust();
             DataOuput.WriteLine(" " + thrust.ToString());
             Debug.Log(Iteration);
-            if (Iteration >= 2000)
-                Application.Quit();
+            if (Iteration >= 100)
+                UnityEditor.EditorApplication.isPlaying = false;
         }
 
         // Display

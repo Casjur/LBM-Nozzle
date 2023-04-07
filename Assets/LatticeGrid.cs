@@ -167,7 +167,7 @@ public partial class LatticeGrid
 
         if(LBM.Iteration % LBM.EveryIterations == 0)
         {
-            LBM.DataOuput.Write(sumDensity);
+            LBM.DataOuput.Write(LBM.Iteration + " " + sumDensity);
         }
         //Debug.Log("Collision Density: " + sumDensity);
     }
