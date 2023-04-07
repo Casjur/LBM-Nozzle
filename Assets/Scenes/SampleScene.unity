@@ -314,7 +314,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e43e16483315bd4887e299ab9f4a439, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maximizeDistribution: 0
+  maximizeDistribution: 1
   RELAXATION_TIME: 8
   SOUND_SPEED: 0.577
   baseDensity: 0.1

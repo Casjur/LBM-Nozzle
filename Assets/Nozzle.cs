@@ -22,7 +22,7 @@ public class Nozzle
     private readonly int throatRadius;
     private readonly int convergeLength;
     //private Func<int, int> curve = x => 1;
-    private readonly Func<int, int> convergeFunction = x => -(x / 3);
+    private readonly Func<int, int> convergeFunction = x => -(int)Math.Sqrt(x); //-(x / 3);
     private readonly int divergeLength;
     private readonly Func<int, int> divergeFunction = x => (int)Math.Sqrt(x); //x; //
     //private int exitRadius;

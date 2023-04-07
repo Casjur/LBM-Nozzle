@@ -92,8 +92,8 @@ public class LBM : MonoBehaviour
             double thrust = this.Grid.CalculateThrust();
             DataOuput.WriteLine(" " + thrust.ToString());
             Debug.Log(Iteration);
-            if (Iteration >= 2000)
-                Application.Quit();
+            if (Iteration >= 100)
+                UnityEditor.EditorApplication.isPlaying = false;
         }
 
         // Display
