@@ -62,7 +62,7 @@ public class LBM : MonoBehaviour
 
     void Start()
     {
-        DataOuput = new StreamWriter("C:/Users/Casper/Documents/Gametechnologie/OnderzoeksMethoden/LBM-Nozzle/Assets/GeneratedData/NozzleData.txt");
+        DataOuput = new StreamWriter("C:/Users/caspe/Lattice-Boltzmann/Assets/GeneratedData/NozzleData.txt");
         Iteration = 0;
 
         this.nozzle = new Nozzle(NozzleX, NozzleY, NozzleLineRadius, CombChamRadius, CombChamLength, ThroatRadius, ConvergeLength, DivergeLength);
