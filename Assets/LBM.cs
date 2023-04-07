@@ -91,13 +91,15 @@ public class LBM : MonoBehaviour
         {
             double thrust = this.Grid.CalculateThrust();
             DataOuput.WriteLine(" " + thrust.ToString());
+
             Debug.Log(Iteration);
-            if (Iteration >= 100)
+
+            // Display
+            this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
+
+            if (Iteration >= 3000)
                 UnityEditor.EditorApplication.isPlaying = false;
         }
-
-        // Display
-        this.Grid.UpdateDisplayTexture(WIDTH, HEIGHT, ref outputMaterial);
 
         // Increment iterations
         Iteration++;

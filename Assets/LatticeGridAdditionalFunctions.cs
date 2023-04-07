@@ -5,6 +5,26 @@ using UnityEngine;
 
 public partial class LatticeGrid
 {
+    public double CalculateCombChambDensity()
+    {
+        double density = 0.0;
+
+        int combChamMinX = this.nozzle.x + this.nozzle.lineRadius;
+        int combChamMaxX = this.nozzle.maxCombChamX; 
+        int combChamMinY = this.nozzle.minCombChamY + this.nozzle.lineRadius;
+        int combChamMaxY = this.nozzle.maxCombChamY - this.nozzle.lineRadius;
+
+        for (int x = combChamMinX; x < combChamMaxX; x++)
+        {
+            for(int y = combChamMinY; y < combChamMaxY; y++)
+            {
+                density += this.latticeGrid[x, y].GetDensity();
+            }
+        }
+
+        return density;
+    }
+
     public double CalculateThrust()
     {
         double thrust = 0.0;
@@ -89,6 +109,14 @@ public partial class LatticeGrid
     {
         Texture2D outputTexture = new Texture2D(width, height);
 
+        int combChamMinX = this.nozzle.x + this.nozzle.lineRadius;
+        int combChamMaxX = this.nozzle.maxCombChamX; //this.nozzle.x + this.nozzle.lineRadius + this.nozzle.combustionChamberLength;
+        int combChamMinY = this.nozzle.minCombChamY + this.nozzle.lineRadius; //this.nozzle.y - this.nozzle.lineRadius - this.nozzle.combustionChamberRadius;
+        int combChamMaxY = this.nozzle.maxCombChamY - this.nozzle.lineRadius; //this.nozzle.y + this.nozzle.lineRadius - this.nozzle.combustionChamberRadius;
+
+        //Debug.Log("minX " + combChamMinX + "; maxX: " + combChamMaxX + "; minY: " + combChamMinY + "; maxY: " + combChamMaxY);
+
+
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -105,19 +133,19 @@ public partial class LatticeGrid
                     double vy = (latticeGrid[x, y] as FluidLatticeNode).velocityY;
 
                     //color = GenerateDensVeloColor(d, vx, vy);
-                    
-                    //color = new Color(1.0f / (float)r, 0, 0);
                     color = GenerateDensityColor(d);
                     //color = GenerateVelocityColor(vx, vy);
+                }
 
-                    // Thrust measuring boundary
-                    //if (x > this.nozzle.outletX - 3 && x < this.nozzle.outletX + 3 && y > this.nozzle.outletYLow && y < this.nozzle.outletYHigh)
-                    //{
-                    //    color += Color.green;
-                    //}
-                    if (x == this.nozzle.outletX && y > this.nozzle.outletYLow + 2 && y < this.nozzle.outletYHigh - 2)
+                if (x == this.nozzle.outletX && y > this.nozzle.outletYLow + 2 && y < this.nozzle.outletYHigh - 2)
+                {
+                    color += Color.green;
+                }
+                else
+                {
+                    if (x >= combChamMinX && x < combChamMaxX && y >= combChamMinY && y <= combChamMaxY)
                     {
-                        color += Color.green;
+                        color += Color.blue;
                     }
                 }
 

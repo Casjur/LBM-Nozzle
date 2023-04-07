@@ -16,21 +16,21 @@ public class Nozzle
     public readonly int outletYHigh;
     public readonly int outletYLow;
 
-    private readonly int lineRadius; // radius of a solid point / line
-    private readonly int combustionChamberRadius;
-    private readonly int combustionChamberLength;
+    public readonly int lineRadius; // radius of a solid point / line
+    public readonly int combustionChamberRadius;
+    public readonly int combustionChamberLength;
     private readonly int throatRadius;
     private readonly int convergeLength;
     //private Func<int, int> curve = x => 1;
-    private readonly Func<int, int> convergeFunction = x => -(int)Math.Sqrt(x); //-(x / 3);
+    private readonly Func<int, int> convergeFunction = x => -x; //-(int)Math.Sqrt(x); //-(x / 3);
     private readonly int divergeLength;
-    private readonly Func<int, int> divergeFunction = x => (int)Math.Sqrt(x); //x; //
+    private readonly Func<int, int> divergeFunction = x => x; //(int)Math.Sqrt(x); //x; //
     //private int exitRadius;
 
     private int minX;
-    private int maxCombChamX;
-    private int minCombChamY;
-    private int maxCombChamY;
+    public readonly int maxCombChamX;
+    public readonly int minCombChamY;
+    public readonly int maxCombChamY;
     private int maxConvX;
     private int maxConvY;
     private int minConvY;
@@ -51,8 +51,8 @@ public class Nozzle
 
         this.minX = x;
         this.maxCombChamX = x + combustChamberLength;
-        this.minCombChamY = y - combustChamberRadius;
-        this.maxCombChamY = y + combustChamberRadius;
+        this.minCombChamY = y - combustChamberRadius;// + lineRadius;
+        this.maxCombChamY = y + combustChamberRadius;// - lineRadius;
         this.maxConvX = maxCombChamX + convergeLength;
         this.maxConvY = maxCombChamY + convergeFunction(convergeLength);
         this.minConvY = minCombChamY - convergeFunction(convergeLength);
@@ -132,17 +132,17 @@ public class Nozzle
     public void UpdateCombustionChamber(double density)
     {
         int minX = this.x + this.lineRadius;
-        int maxX = this.x + this.combustionChamberLength - this.lineRadius;
-        int minY = this.y - this.combustionChamberRadius + this.lineRadius;
-        int maxY = this.y + this.combustionChamberRadius - this.lineRadius;
+        //int maxX = this.x + this.combustionChamberLength - this.lineRadius;
+        //int minY = this.y - this.combustionChamberRadius + this.lineRadius;
+        //int maxY = this.y + this.combustionChamberRadius - this.lineRadius;
 
-        for (int x = minX; x < maxX; x++)
+        for (int x = minX; x < this.maxCombChamX; x++)
         {
-            for (int y = minY; y <= maxY; y++)
+            for (int y = this.minCombChamY + this.lineRadius; y <= this.maxCombChamY - this.lineRadius; y++)
             {
                 //this.grid.latticeGrid[x, y].SetDensity(density);
-                this.grid.latticeGrid[x, y].AddDensityInDirection(density, 1);
-                //this.grid.latticeGrid[x, y].AddDensity(density);
+                //this.grid.latticeGrid[x, y].AddDensityInDirection(density, 1);
+                this.grid.latticeGrid[x, y].AddDensity(density);
             }
         }
     }

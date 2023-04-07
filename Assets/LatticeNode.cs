@@ -4,6 +4,7 @@ using UnityEngine;
 
 public interface LatticeGridNode
 {
+    public double GetDensity();
     public void AddDensity(double density);
     public void AddDensityInDirection(double density, int distributionIndex);
     public void SetDensity(double density);
@@ -31,6 +32,12 @@ public class FluidLatticeNode : LatticeGridNode
             distribution[i] = LatticeGrid.weights[i] * density * (1 + 3 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) + 4.5 * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) * (LatticeGrid.eX[i] * velocityX + LatticeGrid.eY[i] * velocityY) - 1.5 * (velocityX * velocityX + velocityY * velocityY));
         }
     }
+
+    public double GetDensity()
+    {
+        return this.density;
+    }
+
 
     public void SetDensity(double density)
     {
@@ -64,6 +71,11 @@ public class FluidLatticeNode : LatticeGridNode
 
 public class SolidLatticeNode : LatticeGridNode
 {
+    public double GetDensity()
+    {
+        return 0.0;
+    }
+
     public void AddDensity(double density)
     {
         // Do nothing, since the node does not contain liquid

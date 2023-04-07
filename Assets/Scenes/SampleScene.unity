@@ -296,7 +296,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 649803128}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -2.1137466}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 2, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -323,6 +323,6 @@ MonoBehaviour:
   NozzleLineRadius: 3
   CombChamRadius: 20
   CombChamLength: 10
-  ConvergeLength: 30
-  DivergeLength: 80
+  ConvergeLength: 40
+  DivergeLength: 20
   outputMaterial: {fileID: 2100000, guid: 501fc766c7167d34a830cf4a6e30853e, type: 2}
